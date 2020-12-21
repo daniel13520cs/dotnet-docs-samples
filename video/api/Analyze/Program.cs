@@ -23,20 +23,22 @@ namespace GoogleCloudSamples.VideoIntelligence
 {
     class VideoOptions
     {
+        private string _uri = "C:\\Users\\danie\\OneDrive\\Documents\\videos";
         [Value(0, HelpText = "The uri of the video to examine. "
             + "Can be path to a local file or a Cloud storage uri like "
             + "gs://bucket/object.",
             Required = true)]
-        public string Uri { get; set; }
+        public string Uri { get => _uri; set => _uri = value; }
     }
 
     class StorageOnlyVideoOptions
     {
+        private string _uri = "C:\\Users\\danie\\OneDrive\\Documents\\videos";
         [Value(0, HelpText = "The uri of the video to examine. "
             + "Must be a Cloud storage uri like "
             + "gs://bucket/object.",
             Required = true)]
-        public string Uri { get; set; }
+        public string Uri { get => _uri; set => _uri = value; }
     }
 
     [Verb("labels", HelpText = "Print a list of labels found in the video.")]
@@ -606,6 +608,8 @@ namespace GoogleCloudSamples.VideoIntelligence
 
         public static void Main(string[] args)
         {
+            Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", "C:\\Users\\danie\\OneDrive\\Documents\\credentials\\MyFirstProject.json");
+            args = new string[] { "labels", "C:\\Users\\danie\\OneDrive\\Documents\\videos\\test_video.mp4" };
             var verbMap = new VerbMap<object>()
                 .Add((AnalyzeShotsOptions opts) => AnalyzeShotsGcs(opts.Uri))
                 .Add((AnalyzeExplicitContentOptions opts) => AnalyzeExplicitContentGcs(opts.Uri))
