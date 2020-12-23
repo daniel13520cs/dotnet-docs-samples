@@ -18,6 +18,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Xml;
 
 namespace GoogleCloudSamples.VideoIntelligence
 {
@@ -71,6 +73,17 @@ namespace GoogleCloudSamples.VideoIntelligence
 
     public class Analyzer
     {
+        public static string AssemblyDirectory
+        {
+            get
+            {
+                string codeBase = Assembly.GetExecutingAssembly().CodeBase;
+                UriBuilder uri = new UriBuilder(codeBase);
+                string path = Uri.UnescapeDataString(uri.Path);
+                return Path.GetDirectoryName(path);
+            }
+        }
+
         // [START video_analyze_shots]
         public static object AnalyzeShotsGcs(string uri)
         {
@@ -547,6 +560,7 @@ namespace GoogleCloudSamples.VideoIntelligence
         // [START video_object_tracking]
         public static object TrackObject(string filePath)
         {
+            var file = Path.GetFileName(filePath);
             var client = VideoIntelligenceServiceClient.Create();
             var request = new AnnotateVideoRequest
             {
@@ -567,41 +581,78 @@ namespace GoogleCloudSamples.VideoIntelligence
             var objectAnnotations = op.Result.AnnotationResults[0]
                                       .ObjectAnnotations;
 
-            // Get only the first annotation for demo purposes
-            var objAnnotation = objectAnnotations[0];
-
-            Console.WriteLine(
-                $"Entity description: {objAnnotation.Entity.Description}");
-
-            if (objAnnotation.Entity.EntityId != null)
+            // Save results in to files
+            System.IO.FileStream fileStream = System.IO.File.Create(AssemblyDirectory + "\\" + file + @".xml");
+            foreach (var ObjAnnotation in objectAnnotations)
             {
-                Console.WriteLine(
-                    $"Entity id: {objAnnotation.Entity.EntityId}");
+                System.Xml.Serialization.XmlSerializer xmlSerializer = new System.Xml.Serialization.XmlSerializer(ObjAnnotation.GetType());
+                xmlSerializer.Serialize(fileStream, ObjAnnotation);
             }
 
-            Console.Write($"Segment: ");
-            Console.WriteLine(
-                String.Format("{0}s to {1}s",
-                              objAnnotation.Segment.StartTimeOffset.Seconds +
-                              objAnnotation.Segment.StartTimeOffset.Nanos / 1e9,
-                              objAnnotation.Segment.EndTimeOffset.Seconds +
-                              objAnnotation.Segment.EndTimeOffset.Nanos / 1e9));
+            //save result into xml files
+            XmlWriter writer = null;
+            try
+            {
 
-            Console.WriteLine($"Confidence: {objAnnotation.Confidence}");
+                // Create an XmlWriterSettings object with the correct options.
+                XmlWriterSettings settings = new XmlWriterSettings();
+                settings.Indent = true;
+                settings.IndentChars = ("\t");
+                settings.OmitXmlDeclaration = true;
 
-            // Here we print only the bounding box of the first frame in this segment
-            var frame = objAnnotation.Frames[0];
-            var box = frame.NormalizedBoundingBox;
-            Console.WriteLine(
-                String.Format("Time offset of the first frame: {0}s",
-                              frame.TimeOffset.Seconds +
-                              frame.TimeOffset.Nanos / 1e9));
-            Console.WriteLine("Bounding box positions:");
-            Console.WriteLine($"\tleft   : {box.Left}");
-            Console.WriteLine($"\ttop    : {box.Top}");
-            Console.WriteLine($"\tright  : {box.Right}");
-            Console.WriteLine($"\tbottom : {box.Bottom}");
+                // Create the XmlWriter object and write some content.
+                writer = XmlWriter.Create(AssemblyDirectory + "\\" + file + @".xml", settings);
+                writer.WriteStartElement(Path.GetFileName(filePath));
+                foreach (var objAnnotation in objectAnnotations)
+                {
+                    writer.WriteElementString("StartTimeOffsetInSeconds", objAnnotation.Segment.StartTimeOffset.Seconds.ToString());
+                    writer.WriteElementString("EndTimeOffsetUInSeconds", objAnnotation.Segment.EndTimeOffset.Seconds.ToString());
+                }
+                writer.WriteEndElement();
 
+                writer.Flush();
+            }
+            finally
+            {
+                if (writer != null)
+                    writer.Close();
+            }
+
+            // foreach (var objAnnotation in objectAnnotations)
+            // Get only the first annotation for demo purposes
+            {
+                /*Console.WriteLine(
+                    $"Entity description: {objAnnotation.Entity.Description}");
+
+                if (objAnnotation.Entity.EntityId != null)
+                {
+                    Console.WriteLine(
+                        $"Entity id: {objAnnotation.Entity.EntityId}");
+                }
+
+                Console.Write($"Segment: ");
+                Console.WriteLine(
+                    String.Format("{0}s to {1}s",
+                                  objAnnotation.Segment.StartTimeOffset.Seconds +
+                                  objAnnotation.Segment.StartTimeOffset.Nanos / 1e9,
+                                  objAnnotation.Segment.EndTimeOffset.Seconds +
+                                  objAnnotation.Segment.EndTimeOffset.Nanos / 1e9));
+
+                Console.WriteLine($"Confidence: {objAnnotation.Confidence}");
+
+                // Here we print only the bounding box of the first frame in this segment
+                var frame = objAnnotation.Frames[0];
+                var box = frame.NormalizedBoundingBox;
+                Console.WriteLine(
+                    String.Format("Time offset of the first frame: {0}s",
+                                  frame.TimeOffset.Seconds +
+                                  frame.TimeOffset.Nanos / 1e9));
+                Console.WriteLine("Bounding box positions:");
+                Console.WriteLine($"\tleft   : {box.Left}");
+                Console.WriteLine($"\ttop    : {box.Top}");
+                Console.WriteLine($"\tright  : {box.Right}");
+                Console.WriteLine($"\tbottom : {box.Bottom}");*/
+            }
             return 0;
         }
         // [END video_object_tracking]
@@ -609,7 +660,7 @@ namespace GoogleCloudSamples.VideoIntelligence
         public static void Main(string[] args)
         {
             Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", "C:\\Users\\danie\\OneDrive\\Documents\\credentials\\MyFirstProject.json");
-            args = new string[] { "labels", "C:\\Users\\danie\\OneDrive\\Documents\\videos\\test_video.mp4" };
+            args = new string[] { "track-object", "C:\\Users\\danie\\OneDrive\\Documents\\videos\\test_video.mp4" };
             var verbMap = new VerbMap<object>()
                 .Add((AnalyzeShotsOptions opts) => AnalyzeShotsGcs(opts.Uri))
                 .Add((AnalyzeExplicitContentOptions opts) => AnalyzeExplicitContentGcs(opts.Uri))
